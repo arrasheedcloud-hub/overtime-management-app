@@ -1,0 +1,60 @@
+name: Build Android APK
+
+on:
+  workflow_dispatch:
+    inputs:
+      app_url:
+        description: "رابط التطبيق المنشور (مثال: https://overtime-app.vercel.app)"
+        required: true
+        type: string
+
+jobs:
+  build-apk:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: "npm"
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: "temurin"
+          java-version: "17"
+
+      - name: Install Bubblewrap
+        run: npm install -g @bubblewrap/cli
+
+      - name: Initialize TWA project
+        run: |
+          mkdir -p android-twa
+          cd android-twa
+          bubblewrap init --manifest "${{ github.event.inputs.app_url }}/manifest.json" --directory ./
+        env:
+          APP_URL: ${{ github.event.inputs.app_url }}
+
+      - name: Build APK
+        run: |
+          cd android-twa
+          bubblewrap build
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: overtime-app-apk
+          path: android-twa/app-release-signed.apk
+          if-no-files-found: error
+
+      - name: Upload APK unsigned fallback
+        uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: overtime-app-apk-unsigned
+          path: android-twa/app-release-unsigned.apk
+          if-no-files-found: ignore
